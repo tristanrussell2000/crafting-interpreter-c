@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -std=c17 -Wall -Werror -pedantic
-TARGET = bin/interpreter
+TARGET = bin/clox
 LDFLAGS = 
 
 SRCS = $(wildcard *.c)
