@@ -29,7 +29,7 @@ static bool isAlpha(char c) {
 		   c == '_';
 }
 
-static bool isAtEnd() {
+static bool isAtEnd(void) {
 	return *scanner.current == '\0';
 }
 
@@ -51,7 +51,7 @@ static Token errorToken(const char* message) {
 	return token;
 }
 
-static char advance() {
+static char advance(void) {
 	scanner.current++;
 	return scanner.current[-1];
 }
@@ -72,16 +72,16 @@ static TokenType checkKeyword(int start, int length, const char* rest, TokenType
 	return TOKEN_IDENTIFIER;
 }
 
-static char peek() {
+static char peek(void) {
 	return *scanner.current;
 }
 
-static char peekNext() {
+static char peekNext(void) {
 	if (isAtEnd()) return '\0';
 	return scanner.current[1];
 }
 
-static void skipWhitespace() {
+static void skipWhitespace(void) {
 	for (;;) {
 		char c = peek();
 		switch (c) {
@@ -108,7 +108,7 @@ static void skipWhitespace() {
 	}
 }
 
-static Token string() {
+static Token string(void) {
 	while (peek() != '"' && !isAtEnd()) {
 		if (peek() == '\n') scanner.line++;
 		advance();
@@ -121,7 +121,7 @@ static Token string() {
 	return makeToken(TOKEN_STRING);
 }
 
-static Token number() {
+static Token number(void) {
 	while (isDigit(peek())) advance();
 
 	if (peek() == '.' && isDigit(peekNext())) {
@@ -134,7 +134,7 @@ static Token number() {
 	return makeToken(TOKEN_NUMBER);
 }
 
-static TokenType identifierType() {
+static TokenType identifierType(void) {
 	switch (scanner.start[0]) {
 		case 'a': return checkKeyword(1, 2, "nd", TOKEN_AND);
 		case 'c': return checkKeyword(1, 4, "lass", TOKEN_CLASS);
@@ -168,12 +168,12 @@ static TokenType identifierType() {
 	return TOKEN_IDENTIFIER;
 }
 
-static Token identifier() {
+static Token identifier(void) {
 	while (isAlpha(peek()) || isDigit(peek())) advance();
 	return makeToken(identifierType());
 }
 
-Token scanToken() {
+Token scanToken(void) {
 	skipWhitespace();
 	scanner.start = scanner.current;
 
