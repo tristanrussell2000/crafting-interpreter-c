@@ -24,6 +24,5 @@ void freeVM(void);
 InterpretResult interpret(const char* source);
 void push(Value value);
 Value pop(void);
-void negate(void);
 
 #endif
