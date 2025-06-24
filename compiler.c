@@ -42,6 +42,7 @@ typedef struct {
 typedef struct {
 	Token name;
 	int depth;
+	bool isConstant;
 } Local;
 
 typedef struct {
@@ -174,7 +175,7 @@ static void statement(void);
 static void declaration(void);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
-static uint8_t parseVariable(const char* errorMessage); 
+static uint8_t parseVariable(const char* errorMessage, bool isConstant); 
 static void defineVariable(uint8_t global);
 static uint8_t identifierConstant(Token* name);
 
@@ -222,7 +223,7 @@ static void block(void) {
 }
 
 static void varDeclaration(void) {
-	uint8_t global = parseVariable("Expect variable name.");
+	uint8_t global = parseVariable("Expect variable name.", false);
 
 	if (match(TOKEN_EQUAL)) {
 		expression();
@@ -230,6 +231,19 @@ static void varDeclaration(void) {
 		emitByte(OP_NIL);
 	}
 	consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
+
+	defineVariable(global);
+}
+
+static void constDeclaration(void) {
+	uint8_t global = parseVariable("Expect constant name.", true);
+
+	if (match(TOKEN_EQUAL)) {
+		expression();
+	} else {
+		emitByte(OP_NIL);
+	}
+	consume(TOKEN_SEMICOLON, "Expect ';' after constant declaration.");
 
 	defineVariable(global);
 }
@@ -255,6 +269,7 @@ static void synchronize(void) {
 			case TOKEN_CLASS:
 			case TOKEN_FUN:
 			case TOKEN_VAR:
+			case TOKEN_CONST:
 			case TOKEN_FOR:
 			case TOKEN_IF:
 			case TOKEN_WHILE:
@@ -272,6 +287,8 @@ static void synchronize(void) {
 static void declaration(void) {
 	if (match(TOKEN_VAR)) {
 		varDeclaration();
+	} else if (match(TOKEN_CONST)) {
+		constDeclaration();
 	} else {
 		statement();
 	}
@@ -312,12 +329,15 @@ static bool identifiersEqual(Token* a, Token* b) {
 	return memcmp(a->start, b->start, a->length) == 0;
 }
 
-static int resolveLocal(Compiler* compiler, Token*name) {
+static int resolveLocal(Compiler* compiler, Token*name, bool isAssign) {
 	for (int i = compiler->localCount - 1; i >= 0; i--) {
 		Local* local = &compiler->locals[i];
 		if (identifiersEqual(name, &local->name)) {
 			if (local->depth == -1) {
 				error("Can't read local variable in its own initializer.");
+			}
+			if (local->isConstant && isAssign) {
+				error("Can't assign to constant.");
 			}
 			return i;
 		}
@@ -328,7 +348,9 @@ static int resolveLocal(Compiler* compiler, Token*name) {
 
 static void namedVariable(Token name, bool canAssign) {
 	uint8_t getOp, setOp;
-	int arg = resolveLocal(current, &name);
+	bool isAssign = canAssign && match(TOKEN_EQUAL);
+	int arg = resolveLocal(current, &name, isAssign);
+
 	if (arg != -1) {
 		getOp = OP_GET_LOCAL;
 		setOp = OP_SET_LOCAL;
@@ -339,7 +361,7 @@ static void namedVariable(Token name, bool canAssign) {
 	}
 
 	// Lookahead to determine if lookup or assignment
-	if (canAssign && match(TOKEN_EQUAL)) {
+	if (isAssign) {
 		expression();
 		emitBytes(setOp, (uint8_t)arg);
 	} else {
@@ -401,6 +423,7 @@ ParseRule rules[] = {
 	[TOKEN_THIS]		  = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_TRUE]		  = {literal,  NULL,   PREC_NONE},
 	[TOKEN_VAR]			  = {NULL,     NULL,   PREC_NONE},
+	[TOKEN_CONST]	      = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_WHILE]		  = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_ERROR]		  = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_EOF]			  = {NULL,     NULL,   PREC_NONE},
@@ -434,7 +457,7 @@ static uint8_t identifierConstant(Token* name) {
 
 
 
-static void addLocal(Token name) {
+static void addLocal(Token name, bool isConstant) {
 	if (current->localCount == UINT8_COUNT) {
 		error("Too many local variables in function.");
 		return;
@@ -443,9 +466,10 @@ static void addLocal(Token name) {
 	Local* local = &current->locals[current->localCount++];
 	local->name = name;
 	local->depth = -1;
+	local->isConstant = isConstant;
 }
 
-static void declareVariable(void) {
+static void declareVariable(bool isConstant) {
 	if (current->scopeDepth == 0) return;
 
 	Token* name = &parser.previous;
@@ -459,13 +483,13 @@ static void declareVariable(void) {
 			error("Already a variable with this name in this scope.");
 		}
 	}
-	addLocal(*name);
+	addLocal(*name, isConstant);
 }
 
-static uint8_t parseVariable(const char* errorMessage) {
+static uint8_t parseVariable(const char* errorMessage, bool isConstant) {
 	consume(TOKEN_IDENTIFIER, errorMessage);
 
-	declareVariable();
+	declareVariable(isConstant);
 	if (current->scopeDepth > 0) return 0;
 
 	return identifierConstant(&parser.previous);
