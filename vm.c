@@ -31,12 +31,11 @@ void initVM(void) {
 	resetStack();
 	vm.objects = NULL;
 	initTable(&vm.strings);
-	initTable(&vm.globals);
 }
 
 void freeVM(void) {
 	freeTable(&vm.strings);
-	freeTable(&vm.globals);
+	FREE_ARRAY(uint8_t, &vm.globals, vm.chunk->globalCount);
 	freeObjects();
 }
 
@@ -112,8 +111,8 @@ static InterpretResult run(void) {
 			case OP_POP: pop(); break;
 			case OP_GET_GLOBAL: {
 				ObjString* name = READ_STRING();
-				Value value;
-				if (!tableGet(&vm.globals, name, &value)) {
+				Value value = vm.globals[READ_BYTE()];
+				if (value.type) {
 					runtimeError("Undefined variable '%s'.", name->chars);
 					return INTERPRET_RUNTIME_ERROR;
 				}
@@ -121,16 +120,15 @@ static InterpretResult run(void) {
 				break;
 			}
 			case OP_DEFINE_GLOBAL: {
-				ObjString* name = READ_STRING();
-				tableSet(&vm.globals, name, peek(0));
+				uint8_t idx = READ_BYTE();
+				vm.globals[idx] = peek(0);
 				pop();
 				break;
 			}
 			case OP_SET_GLOBAL: {
-				ObjString* name = READ_STRING();
-				if (tableSet(&vm.globals, name, peek(0))) {
-					tableDelete(&vm.globals, name);
-					runtimeError("Undefined variable '%s'.", name->chars);
+				uint8_t idx = READ_BYTE();
+				if (vm.globals[idx].type) {
+					runtimeError("Undefined variable '%s'.", vm.chunk->globalIndices[idx]->chars);
 					return INTERPRET_RUNTIME_ERROR;
 				}
 				break;
@@ -196,8 +194,10 @@ InterpretResult interpret(const char* source) {
 		return INTERPRET_COMPILE_ERROR;
 	}
 
+
 	vm.chunk = &chunk;
 	vm.ip = vm.chunk->code;
+	vm.globals = ALLOCATE(Value, vm.chunk->globalCount);
 
 	InterpretResult result = run();
 

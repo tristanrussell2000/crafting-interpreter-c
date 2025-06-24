@@ -5,6 +5,7 @@
 #include "compiler.h"
 #include "scanner.h"
 #include "vm.h"
+#include "memory.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -13,6 +14,10 @@
 typedef struct {
 	Token current;
 	Token previous;
+	Table globalNames;
+	ObjString** globalIndices;
+	uint8_t globalIndicesCapacity;
+	uint8_t globalCount;
 	bool hadError;
 	bool panicMode;
 } Parser;
@@ -41,6 +46,18 @@ typedef struct {
 
 Parser parser;
 Chunk* compilingChunk;
+
+static void addGlobalIndex(ObjString* key) {
+	if (parser.globalIndicesCapacity < parser.globalCount + 1) {
+		int oldCapacity = parser.globalIndicesCapacity;
+		parser.globalIndicesCapacity = GROW_CAPACITY(oldCapacity);
+		parser.globalIndices = GROW_ARRAY(ObjString*, parser.globalIndices, oldCapacity, parser.globalIndicesCapacity);
+	}
+
+	parser.globalIndices[parser.globalCount] = key;
+	parser.globalCount++;
+}
+
 
 static Chunk* currentChunk(void) {
 	return compilingChunk;
@@ -362,7 +379,16 @@ static uint8_t identifierConstant(Token* name) {
 
 static uint8_t parseVariable(const char* errorMessage) {
 	consume(TOKEN_IDENTIFIER, errorMessage);
-	return identifierConstant(&parser.previous);
+	Value globalIndex;
+	ObjString* key = copyString(parser.previous.start, parser.previous.length);
+	bool isDefined = tableGet(&parser.globalNames, key, &globalIndex);
+	if (isDefined) {
+		return (uint8_t)globalIndex.as.number;
+	} else {
+		tableSet(&parser.globalNames, key, NUMBER_VAL(parser.globalCount));
+		addGlobalIndex(key);
+		return parser.globalCount - 1;
+	}
 }
 
 static void defineVariable(uint8_t global) {
@@ -375,10 +401,14 @@ static ParseRule* getRule(TokenType type) {
 
 bool compile(const char* source, Chunk* chunk) {
 	initScanner(source);
-	compilingChunk = chunk;
+	parser.globalIndices = NULL;
 
+	compilingChunk = chunk;
+	parser.globalCount = 0;
 	parser.hadError = false;
 	parser.panicMode = false;
+	initTable(&parser.globalNames);
+	parser.globalCount = 0;
 
 	advance();
 	while (!match(TOKEN_EOF)) {
@@ -387,6 +417,9 @@ bool compile(const char* source, Chunk* chunk) {
 
 	consume(TOKEN_EOF, "Expect end of expression");
 	endCompiler();
+	chunk->globalIndices = parser.globalIndices;
+
+	chunk->globalCount = parser.globalCount;
 	return !parser.hadError;
 }
 

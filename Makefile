@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=c17 -Wall -Werror -pedantic
+CFLAGS = -std=c17 -Wall -Werror -pedantic -g
 TARGET = bin/clox
 LDFLAGS = 
 

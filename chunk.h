@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "value.h"
+#include "table.h"
 
 typedef enum {
 	OP_CONSTANT,
@@ -39,6 +40,8 @@ typedef struct {
 	uint8_t* code;
 	LineCount* lines;
 	ValueArray constants;
+	ObjString** globalIndices;
+	uint8_t globalCount;
 } Chunk;
 
 void initChunk(Chunk* chunk);

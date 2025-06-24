@@ -10,6 +10,8 @@ void initChunk(Chunk* chunk) {
 	chunk->lines = NULL;
 	chunk->line_count = 0;
 	chunk->line_capacity=0;
+	chunk->globalCount = 0;
+	chunk->globalIndices = NULL;
 	initValueArray(&chunk->constants);
 }
 
@@ -45,6 +47,7 @@ void writeChunk(Chunk* chunk, uint8_t byte, int line) {
 void freeChunk(Chunk* chunk) {
 	FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
 	FREE_ARRAY(LineCount, chunk->lines, chunk->capacity);
+	FREE_ARRAY(ObjString*, chunk->globalIndices, chunk->globalCount);
 	freeValueArray(&chunk->constants);
 	initChunk(chunk);
 }

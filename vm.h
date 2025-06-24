@@ -12,7 +12,7 @@ typedef struct {
 	uint8_t* ip; // Instruction Pointer
 	Value stack[STACK_MAX];
 	Value* stackTop;
-	Table globals;
+	Value* globals;
 	Table strings;
 	Obj* objects; // Pointer to head of list of objects
 } VM;
