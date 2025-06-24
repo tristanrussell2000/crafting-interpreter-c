@@ -399,12 +399,12 @@ static ParseRule* getRule(TokenType type) {
 	return &rules[type];
 }
 
-bool compile(const char* source, Chunk* chunk) {
+bool compile(const char* source, Chunk* chunk, uint8_t globalCount) {
 	initScanner(source);
 	parser.globalIndices = NULL;
 
 	compilingChunk = chunk;
-	parser.globalCount = 0;
+	parser.globalCount = globalCount;
 	parser.hadError = false;
 	parser.panicMode = false;
 	initTable(&parser.globalNames);

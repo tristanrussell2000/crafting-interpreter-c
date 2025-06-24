@@ -13,6 +13,7 @@ typedef struct {
 	Value stack[STACK_MAX];
 	Value* stackTop;
 	Value* globals;
+	uint8_t globalCount;
 	Table strings;
 	Obj* objects; // Pointer to head of list of objects
 } VM;

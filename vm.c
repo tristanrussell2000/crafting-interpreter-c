@@ -30,6 +30,7 @@ static void runtimeError(const char* format, ...) {
 void initVM(void) {
 	resetStack();
 	vm.objects = NULL;
+	vm.globalCount = 0;
 	initTable(&vm.strings);
 }
 
@@ -110,10 +111,8 @@ static InterpretResult run(void) {
 			case OP_FALSE: push(BOOL_VAL(false)); break;
 			case OP_POP: pop(); break;
 			case OP_GET_GLOBAL: {
-				ObjString* name = READ_STRING();
 				Value value = vm.globals[READ_BYTE()];
-				if (value.type) {
-					runtimeError("Undefined variable '%s'.", name->chars);
+				if (!value.type) {
 					return INTERPRET_RUNTIME_ERROR;
 				}
 				push(value);
@@ -189,15 +188,15 @@ InterpretResult interpret(const char* source) {
 	Chunk chunk;
 	initChunk(&chunk);
 
-	if (!compile(source, &chunk)) {
+	if (!compile(source, &chunk, vm.globalCount)) {
 		freeChunk(&chunk);
 		return INTERPRET_COMPILE_ERROR;
 	}
 
-
 	vm.chunk = &chunk;
 	vm.ip = vm.chunk->code;
-	vm.globals = ALLOCATE(Value, vm.chunk->globalCount);
+	vm.globals = GROW_ARRAY(Value,vm.globals, vm.globalCount, vm.globalCount + vm.chunk->globalCount);
+	vm.globalCount += vm.chunk->globalCount; 
 
 	InterpretResult result = run();
 
