@@ -199,8 +199,8 @@ static void endScope(void) {
 
 // Forward Declarations
 static void expression(void);
-static void statement(void);
-static void declaration(void);
+static void statement(int loopOffset);
+static void declaration(int loopOffset);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 static uint8_t parseVariable(const char* errorMessage); 
@@ -243,9 +243,9 @@ static void expression(void) {
 	parsePrecedence(PREC_ASSIGNMENT);
 }
 
-static void block(void) {
+static void block(int loopOffset) {
 	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-		declaration();
+		declaration(loopOffset);
 	}
 
 	consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
@@ -304,8 +304,7 @@ static void forStatement(void) {
 		patchJump(bodyJump);
 	}
 
-
-	statement();
+	statement(loopStart);
 	emitLoop(loopStart);
 
 	if (exitJump != -1) {
@@ -316,21 +315,31 @@ static void forStatement(void) {
 	endScope();
 }
 
-static void ifStatement(void) {
+
+static void continueStatement(int loopOffset) {
+	if (loopOffset == -1) {
+		error("Can't use continue outside of loop.");
+		return;
+	}
+	consume(TOKEN_SEMICOLON, "Expect ';' after continue.");
+	emitLoop(loopOffset);
+}
+
+static void ifStatement(int loopOffset) {
 	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
 	expression();
 	consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
 
 	int thenJump = emitJump(OP_JUMP_IF_FALSE);
 	emitByte(OP_POP);
-	statement();
+	statement(loopOffset);
 
 	int elseJump = emitJump(OP_JUMP);
 
 	patchJump(thenJump);
 	emitByte(OP_POP);
 
-	if (match(TOKEN_ELSE)) statement();
+	if (match(TOKEN_ELSE)) statement(loopOffset);
 	patchJump(elseJump);
 }
 
@@ -349,7 +358,7 @@ static void whileStatement(void) {
 	int exitJump = emitJump(OP_JUMP_IF_FALSE);
 	emitByte(OP_POP);
 
-	statement();
+	statement(loopStart);
 	emitLoop(loopStart);
 
 	patchJump(exitJump);
@@ -379,28 +388,30 @@ static void synchronize(void) {
 	}
 }
 
-static void declaration(void) {
+static void declaration(int loopOffset) {
 	if (match(TOKEN_VAR)) {
 		varDeclaration();
 	} else {
-		statement();
+		statement(loopOffset);
 	}
 
 	if (parser.panicMode) synchronize();
 }
 
-static void statement(void) {
+static void statement(int loopOffset) {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
 	} else if (match(TOKEN_IF)) {
-		ifStatement();	
+		ifStatement(loopOffset);	
 	} else if (match(TOKEN_WHILE)) {
 		whileStatement();
 	} else if (match(TOKEN_FOR)) {
 		forStatement();	
+	} else if (match(TOKEN_CONTINUE)) {
+		continueStatement(loopOffset);
 	} else if (match(TOKEN_LEFT_BRACE)) {
 		beginScope();
-		block();
+		block(loopOffset);
 		endScope();
 	} else{
 		expressionStatement();
@@ -531,6 +542,7 @@ ParseRule rules[] = {
 	[TOKEN_WHILE]		  = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_ERROR]		  = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_EOF]			  = {NULL,     NULL,   PREC_NONE},
+	[TOKEN_CONTINUE]	  = {NULL,     NULL,   PREC_NONE},
 };
 
 static void parsePrecedence(Precedence precedence) {
@@ -634,7 +646,7 @@ bool compile(const char* source, Chunk* chunk) {
 
 	advance();
 	while (!match(TOKEN_EOF)) {
-		declaration();
+		declaration(-1);
 	}
 
 	consume(TOKEN_EOF, "Expect end of expression");

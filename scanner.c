@@ -66,6 +66,7 @@ static bool match(char expected) {
 static TokenType checkKeyword(int start, int length, const char* rest, TokenType type) {
 	if (scanner.current - scanner.start == start + length &&
 			memcmp(scanner.start + start, rest, length) == 0) {
+		if (type == TOKEN_CONTINUE) printf("TESTING");
 		return type;
 	}
 
@@ -137,7 +138,14 @@ static Token number(void) {
 static TokenType identifierType(void) {
 	switch (scanner.start[0]) {
 		case 'a': return checkKeyword(1, 2, "nd", TOKEN_AND);
-		case 'c': return checkKeyword(1, 4, "lass", TOKEN_CLASS);
+		case 'c': 
+			if (scanner.current - scanner.start > 1) {
+				switch(scanner.start[1]) {
+					case 'l': return checkKeyword(2, 3, "ass", TOKEN_CLASS);
+					case 'o': return checkKeyword(2, 6, "ntinue", TOKEN_CONTINUE);
+				}
+			}
+			break;
 		case 'e': return checkKeyword(1, 3, "lse", TOKEN_ELSE);
 		case 'f':
 			if (scanner.current - scanner.start > 1) {
