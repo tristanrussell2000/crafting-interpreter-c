@@ -7,6 +7,8 @@
 
 #define DEBUG_PRINT_CODE
 //#define DEBUG_TRACE_EXECUTIO
+#define DEBUG_STRESS_GC_DISABLE
+#define DEBUG_LOG_GC
 
 #define UINT8_COUNT (UINT8_MAX + 1)
 
