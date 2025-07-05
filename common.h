@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #define DEBUG_PRINT_CODE
-//#define DEBUG_TRACE_EXECUTIO
+#define DEBUG_TRACE_EXECUTION
 #define DEBUG_STRESS_GC_DISABLE
 #define DEBUG_LOG_GC
 
